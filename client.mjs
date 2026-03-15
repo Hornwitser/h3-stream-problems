@@ -5,7 +5,6 @@ import { pipeline } from "node:stream";
 const hasOpt = opt => process.argv.indexOf(opt) !== -1;
 const query = new URLSearchParams();
 if (hasOpt("web")) query.append("type", "web")
-if (hasOpt("raw")) query.append("raw", "1")
 if (hasOpt("fast")) query.append("fast", "1")
 if (hasOpt("server-error")) query.append("error", "1")
 const post = hasOpt("post");
@@ -29,6 +28,9 @@ const req = http.request(
 		res.on("close", () => req.destroy());
 	}
 );
+req.on("error", (err) => {
+	console.log("request error", err);
+});
 if (post) {
 	pipeline(nodeStream(clientError), req, (err) => {
 		if (err) {

@@ -1,41 +1,28 @@
-import { createApp, createRouter, defineEventHandler, toNodeListener, getQuery, getRequestWebStream } from "h3";
+import { H3, defineEventHandler, getQuery } from "h3";
+import { toNodeHandler } from "h3/node";
 import { createServer } from "node:http";
 import { pipeline } from "node:stream";
 import { nodeSlowConsumer, nodeStream, webStream } from "./streams.mjs";
 
-const app = createApp();
-const router = createRouter();
-app.use(router);
+const app = new H3();
 
-router.get(
+app.get(
 	"/stream",
 	defineEventHandler((event) => {
-		console.log("GET", event.path)
+		console.log("GET", event.url.pathname + event.url.search);
 		const query = getQuery(event);
 		const error = Boolean(query.error)
-		const stream = query.type === "web" ? webStream(error) : nodeStream(error);
-		if (query.raw) {
-			pipeline(stream, event.node.res, (err) => {
-				if (err) {
-					console.log("stream error", err)
-				} else {
-					console.log("stream done")
-				}
-			})
-			event._handled = true;
-		} else {
-			return stream;
-		}
+		return query.type === "web" ? webStream(error) : nodeStream(error);
 	})
 )
 
-router.post(
+app.post(
 	"/stream",
 	defineEventHandler(async (event) => {
-		console.log("POST", event.path)
+		console.log("GET", event.url.pathname + event.url.search);
 		const query = getQuery(event);
 		const error = Boolean(query.error);
-		const stream = query.type === "web" ? getRequestWebStream(event) : event.node.req;
+		const stream = query.type === "web" ? event.req.body : event.runtime.node.req;
 		return await new Promise((resolve, reject) => {
 			pipeline(stream, nodeSlowConsumer(error), (err) => {
 				if (err) {
@@ -50,4 +37,4 @@ router.post(
 	})
 )
 
-createServer(toNodeListener(app)).listen(process.env.PORT || 3000);
+createServer(toNodeHandler(app)).listen(process.env.PORT || 3000);
